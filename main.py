@@ -12,7 +12,7 @@ for a in range(n_act):
 s_dim = 84*84
 cur_time = time.clock()
 s = env.reset()
-env.render()
+#env.render()
 def process_obs(obs):
     s = np.float32(obs)/255.0
     s = .299*s[:,:,0]+.587*s[:,:,1]+.114*s[:,:,2]
@@ -51,6 +51,7 @@ for a in range(n_act):
     mem_full.append(False)
 episode_actions = []
 Ret = 0
+cumr = 0
 warming = True
 for i in range(int(1e7)):
     obs = process_obs(s)
@@ -61,7 +62,7 @@ for i in range(int(1e7)):
     episode_states[action].append(obs)
     for _ in range(4):
         s,r,done,_ = env.step(action)
-    env.render()
+    #env.render()
     if r > 0:
         reward = 1.0
         #print(i,done,r,reward)
@@ -72,7 +73,8 @@ for i in range(int(1e7)):
         reward = 0.0
     Ret+=reward
     if done:
-        print(i,'done!',Ret)
+        #print(i,'done!',Ret)
+        cumr+=Ret
         if warming:
             if i > 1:
                 warming = False
@@ -101,3 +103,7 @@ for i in range(int(1e7)):
                 knn[a].fit(S[a][:max_ind])
                 episode_states[a] = []
         Ret = 0
+    if i % 1000 == 0:
+        print(i,cumr,time.clock()-cur_time)
+        cumr = 0
+        cur_time = time.clock()
