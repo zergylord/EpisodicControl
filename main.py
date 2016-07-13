@@ -31,16 +31,21 @@ def get_action(rep):
             max_q_val = q_val
             act = a
             tied = []
-        elif q_val == max_q_val:
+            a_not_in_tied = True
+        elif a != act and q_val == max_q_val:
+            if not tied:
+                tied.append(act)
             tied.append(a)
+            act = a
     if tied:
-        act = tied[np.random.randint(len(tied))]
+        act = np.random.choice(tied) 
     return act
 
 
 
 mem_size = int(1e5)
 rep_dim = 64
+M = np.random.randn(s_dim,rep_dim)
 S = np.zeros((n_act,mem_size,rep_dim))
 R = np.zeros((n_act,mem_size,))
 mem_ind = np.zeros((n_act,),dtype=int)
@@ -51,28 +56,31 @@ for a in range(n_act):
     mem_full.append(False)
 episode_actions = []
 Ret = 0
-cumr = 0
+cumr = 0.0
+episodes = 0.0
 warming = True
+refresh = int(1e3)
 for i in range(int(1e7)):
     obs = process_obs(s)
     if np.random.rand() < .005 or warming:
         action = env.action_space.sample()
     else:
-        action = get_action(np.matmul(obs,np.random.randn(s_dim,rep_dim)))
+        action = get_action(np.matmul(obs,M))
     episode_states[action].append(obs)
+    reward = 0.0
     for _ in range(4):
         s,r,done,_ = env.step(action)
+        reward+=r
+        '''
+        if r > 0:
+            reward += 1.0
+        elif r < 0:
+            reward += -1.0
+        '''
     #env.render()
-    if r > 0:
-        reward = 1.0
-        #print(i,done,r,reward)
-    elif r < 0:
-        reward = -1.0
-        #print(i,done,r,reward)
-    else:
-        reward = 0.0
     Ret+=reward
     if done:
+        episodes+=1
         #print(i,'done!',Ret)
         cumr+=Ret
         if warming:
@@ -82,7 +90,7 @@ for i in range(int(1e7)):
         for a in range(n_act):
             n_reps = len(episode_states[a])
             if n_reps > 0:
-                episode_reps = np.matmul(np.asarray(episode_states[a]),np.random.randn(s_dim,rep_dim))
+                episode_reps = np.matmul(np.asarray(episode_states[a]),M)
                 if mem_ind[a] + n_reps >= mem_size:
                     mem_full[a] = True
                     remaining = mem_size-mem_ind[a]
@@ -103,7 +111,8 @@ for i in range(int(1e7)):
                 knn[a].fit(S[a][:max_ind])
                 episode_states[a] = []
         Ret = 0
-    if i % 1000 == 0:
-        print(i,cumr,time.clock()-cur_time)
-        cumr = 0
+    if i >0 and i % refresh == 0:
+        print(i,cumr/episodes,time.clock()-cur_time)
+        episodes = 0.0
+        cumr = 0.0
         cur_time = time.clock()
