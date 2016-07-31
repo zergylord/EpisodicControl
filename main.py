@@ -23,9 +23,12 @@ def get_action(rep):
     max_q_val = float("-inf")
     act = 0
     tied = []
+    nearby = []
     for a in range(n_act):
+        nearby.append([])
         _,inds = knn[a].kneighbors(np.expand_dims(rep,0))
         inds = inds[0]
+        nearby[a] = inds
         q_val = np.sum(R[a][inds])
         if q_val > max_q_val:
             max_q_val = q_val
@@ -39,7 +42,7 @@ def get_action(rep):
             act = a
     if tied:
         act = np.random.choice(tied) 
-    return act
+    return act,nearby
 
 
 
@@ -50,10 +53,8 @@ S = np.zeros((n_act,mem_size,rep_dim))
 R = np.zeros((n_act,mem_size,))
 mem_ind = np.zeros((n_act,),dtype=int)
 episode_states = []
-mem_full = []
 for a in range(n_act):
     episode_states.append([])
-    mem_full.append(False)
 episode_actions = []
 Ret = 0
 cumr = 0.0
@@ -62,10 +63,17 @@ warming = True
 refresh = int(1e3)
 for i in range(int(1e7)):
     obs = process_obs(s)
+    
+    if not warming:
+        action,nearby = get_action(np.matmul(obs,M))
+        #move recently used indices to the back of the list (so they wont be killed)
+        for a in range(n_act):
+            S[a] = np.insert(np.delete(S[a],nearby[a],0),mem_ind[a],S[a][nearby[a]],0)
+            R[a] = np.insert(np.delete(R[a],nearby[a],0),mem_ind[a],R[a][nearby[a]],0)
+
     if np.random.rand() < .005 or warming:
         action = env.action_space.sample()
-    else:
-        action = get_action(np.matmul(obs,M))
+    
     episode_states[action].append(obs)
     reward = 0.0
     for _ in range(4):
@@ -92,23 +100,18 @@ for i in range(int(1e7)):
             if n_reps > 0:
                 episode_reps = np.matmul(np.asarray(episode_states[a]),M)
                 if mem_ind[a] + n_reps >= mem_size:
-                    mem_full[a] = True
                     remaining = mem_size-mem_ind[a]
                     overflow = n_reps-remaining
                     S[a,mem_ind[a]:] = episode_reps[:remaining]
                     R[a,mem_ind[a]:] = Ret
                     S[a,:overflow] = episode_reps[remaining:]
                     R[a,:overflow] = Ret
-                    mem_ind[a] = overflow
+                    mem_ind[a] = mem_size
                 else:
                     S[a,mem_ind[a]:mem_ind[a]+n_reps] = episode_reps
                     R[a,mem_ind[a]:mem_ind[a]+n_reps] = Ret
                     mem_ind[a] += n_reps
-                if mem_full[a]:
-                    max_ind = mem_size
-                else:
-                    max_ind = mem_ind[a]
-                knn[a].fit(S[a][:max_ind])
+                knn[a].fit(S[a][:mem_ind[a]])
                 episode_states[a] = []
         Ret = 0
     if i >0 and i % refresh == 0:
