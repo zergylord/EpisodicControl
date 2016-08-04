@@ -14,7 +14,7 @@ n_act = env.action_space.n
 print(n_act)
 knn = []
 for a in range(n_act):
-    knn.append(NearestNeighbors(n_neighbors=num_neighbors))
+    knn.append(NearestNeighbors(n_neighbors=num_neighbors,metric='euclidean'))
 s_dim = 84*84
 cur_time = time.clock()
 s = env.reset()
@@ -86,9 +86,10 @@ plt.ion()
 r_hist = []
 for i in range(int(1e7)):
     obs = process_obs(s)
+    state = np.matmul(obs,M)
     
     if not warming:
-        action,nearby,match = get_action(np.matmul(obs,M))
+        action,nearby,match = get_action(state)
         for a in range(n_act):
             last_used[a,nearby[a]] = i
 
@@ -101,7 +102,7 @@ for i in range(int(1e7)):
         episode_matches[action].append(-np.inf)
     
     episode_actions.append(action)
-    episode_states[action].append(obs)
+    episode_states[action].append(state)
     reward = 0.0
     for _ in range(1): #builtin 2-4 frameskip
         s,r,done,_ = env.step(action)
@@ -129,7 +130,7 @@ for i in range(int(1e7)):
         for a in range(n_act):
             n_reps = len(episode_states[a])
             if n_reps > 0:
-                episode_reps = np.matmul(np.asarray(episode_states[a]),M)
+                episode_reps = np.asarray(episode_states[a])
                 replace_these = np.argpartition(last_used[a],n_reps-1)[:n_reps]
                 last_used[a][replace_these] = i
                 S[a,replace_these] = episode_reps

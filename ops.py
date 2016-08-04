@@ -1,4 +1,3 @@
-import tensorflow as tf
 import numpy as np
 eps = 1e-10
 def compute_return(rewards,gamma):
