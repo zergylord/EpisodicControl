@@ -67,7 +67,7 @@ def get_action(rep):
 
 
 mem_size = int(1e6)
-rep_dim = 2 #64
+rep_dim = 64
 M = np.random.randn(s_dim,rep_dim)
 S = np.zeros((n_act,mem_size,rep_dim))
 R = np.zeros((n_act,mem_size,))
