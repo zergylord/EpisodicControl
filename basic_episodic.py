@@ -23,7 +23,8 @@ for a in range(n_act):
 s_dim = 84*84 #env.observation_space.shape[0]
 cur_time = time.clock()
 s = env.reset()
-#env.render()
+env.render()
+render_time = True
 def process_obs(obs):
     s = np.float32(obs)/255.0
     s = .299*s[:,:,0]+.587*s[:,:,1]+.114*s[:,:,2]
@@ -82,13 +83,18 @@ refresh = int(1e4)
 plt.ion()
 r_hist = []
 def episode_reset():
-    global cur_step,episode_states,episode_matches,episode_match_inds,episode_actions,episode_rewards
+    global s,max_lives,cur_step,episode_states,episode_matches,episode_match_inds,episode_actions,episode_rewards
     cur_step = 0
     episode_states = []
     episode_matches = []
     episode_match_inds = []
     episode_actions = []
     episode_rewards = []
+    s = env.reset()
+    num_noops = np.random.randint(30)
+    for i in range(num_noops):
+        s,_,_,_ = env.step(0)
+    max_lives = env.ale.lives()
 episode_reset()
 for i in range(int(1e7)):
     state = process_obs(s)
@@ -111,25 +117,32 @@ for i in range(int(1e7)):
     episode_states.append(state)
     reward = 0.0
     s,r,done,_ = env.step(action)
+    done = done or env.ale.lives() < max_lives
     cur_step+=1
     '''
     if cur_step >= 1e3:
         done = True
     '''
     reward+=r
-    episode_rewards.append(reward)
-    #env.render()
+    if reward > 0.0:
+        episode_rewards.append(1.0)
+    elif reward < 0.0:
+        episode_rewards.append(-1.0)
+    else:
+        episode_rewards.append(0.0)
+    if render_time:
+        env.render()
     Ret+=reward
 
     #-------------------end of episode processing---------------------------
     if done:
+        render_time = False
         episodes+=1
         #print(i,'done!',Ret)
         cumr+=Ret
         if warming:
             if i > 250:
                 warming = False
-        s = env.reset()
         episode_rets = np.asarray(compute_return(episode_rewards,gamma))
         episode_states = np.asarray(episode_states)
         episode_actions = np.asarray(episode_actions)
@@ -174,6 +187,7 @@ for i in range(int(1e7)):
         for a in range(n_act):
             print(unique_rows(S[a]))
         '''
+        render_time = True
         plt.clf()
         #plt.plot(last_used[0])
         r_hist.append(cumr/(episodes+1e-10))
