@@ -124,12 +124,15 @@ for i in range(int(1e7)):
         done = True
     '''
     reward+=r
+    episode_rewards.append(np.clip(reward,-1,1))
+    '''
     if reward > 0.0:
         episode_rewards.append(1.0)
     elif reward < 0.0:
         episode_rewards.append(-1.0)
     else:
         episode_rewards.append(0.0)
+    '''
     if render_time:
         env.render()
     Ret+=reward
